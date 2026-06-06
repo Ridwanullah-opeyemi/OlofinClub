@@ -187,7 +187,7 @@ export const forgotPassword = async (req, res) => {
 
     if (updateErr) throw updateErr;
 
-    const passwordResetLink = `http://localhost:3000/reset-password/${resetToken}`;
+    const passwordResetLink = `https://olofin-heritage-club.vercel.app/reset-password/${resetToken}`;
 
     const forgotEmailTemplate = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
