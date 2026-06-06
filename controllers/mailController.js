@@ -6,7 +6,7 @@ dotenv.config();
 // Create the reusable transporter engine using your SMTP configurations
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST || "smtp.gmail.com", 
-  port: process.env.EMAIL_PORT || 587,
+  port: process.env.EMAIL_PORT || 465,
   secure: true, // true for port 465, false for other ports
   auth: {
     user: process.env.SYSTEM_EMAIL, // Your platform email address
