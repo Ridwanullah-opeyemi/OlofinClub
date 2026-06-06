@@ -86,9 +86,9 @@ export const resolveMembershipRequest = async (req, res) => {
                   <p>We are excited to inform you that the administration panel has reviewed and <strong>approved</strong> your membership request!</p>
                   <p>You can now log into your personal profile dashboard space, start your monthly contributions, and participate in our active funding channels.</p>
                   <div style="margin: 25px 0; text-align: center;">
-                  <a href="http://localhost:3000/login" style="background-color: #3498db; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Click Here to Login</a>
+                  <a href="https://olofin-heritage-club.vercel.app/login" style="background-color: #3498db; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Click Here to Login</a>
                  </div>
-                    <p style="color: #7f8c8d; font-size: 12px;">If the button above does not work, copy and paste this link into your browser: http://localhost:3000/login</p>
+                    <p style="color: #7f8c8d; font-size: 12px;">If the button above does not work, copy and paste this link into your browser: https://olofin-heritage-club.vercel.app/login</p>
                  <hr style="border: 0; border-top: 1px solid #eee; margin-top: 20px;" />
                   <p style="font-size: 11px; color: #95a5a6; text-align: center;">Olofin Heritage Club Framework © 2026</p>
               </div>

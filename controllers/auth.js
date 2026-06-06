@@ -1,4 +1,3 @@
-
 import supabase from "../config/db.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -12,7 +11,6 @@ export const registerUser = async (req, res) => {
   try {
     const { username, email, password, phone, role } = req.body;
 
-    // 1. Basic Validation
     if (!username || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -20,32 +18,28 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    // Sanitize input data
     const sanitizedEmail = email.trim().toLowerCase();
 
-    // 2. Securely Hash the Password using bcrypt
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 3. Insert into your Supabase 'users' table
     const { data, error } = await supabase
       .from("users")
       .insert([
         {
           username,
           email: sanitizedEmail,
-          password: hashedPassword, // 🔥 Saved safely as an encrypted hash string!
+          password: hashedPassword, 
           phone: phone || null,
           amount_paid: 0,
           is_verified: false,
-          role: role || "member", // Defaults to 'member' if admin doesn't specify 'admin'
+          role: role || "member", 
         },
       ])
-      .select(); // Returns the newly created record details
+      .select(); 
 
-    // 4. Handle database insertion errors (like duplicate emails)
     if (error) {
-      if (error.code === "23505") { // PostgreSQL code for unique constraint violation
+      if (error.code === "23505") { 
         return res.status(400).json({
           success: false,
           message: "A user with this email already exists.",
@@ -54,11 +48,9 @@ export const registerUser = async (req, res) => {
       throw error;
     }
 
-    // Strip out the hashed password from the response data so it stays completely secret
     const secureUserData = { ...data[0] };
     delete secureUserData.password;
 
-    // 5. Return complete success response
     return res.status(201).json({
       success: true,
       message: "User account created successfully by Admin.",
@@ -82,7 +74,6 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // 1. Basic validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -90,7 +81,6 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // 2. Fetch the user profile data from Supabase
     const { data: user, error } = await supabase
       .from("users")
       .select("*")
@@ -100,47 +90,41 @@ export const loginUser = async (req, res) => {
     if (error || !user) {
       return res.status(401).json({
         success: false,
-        message: "Invalid login credentials provided.",
+        message: "Invalid login credentials provided. (User not found)",
       });
     }
 
-    // 3. Compare passwords using bcrypt
+    // Compare incoming string password with DB hash string
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: "Invalid login credentials provided.",
+        message: "Invalid login credentials provided. (Password mismatch)",
       });
     }
 
-    // ⚙️ FALLBACK LOGIC: Safely maps old database records to the new role hierarchy seamlessly
-    let determinedRoleTier = user.role_tier;
+    // ⚙️ FIXED FALLBACK LOGIC: Safely evaluate role values
+    let determinedRoleTier = user.role_tier || user.role || "member";
     let determinedFounderStatus = user.is_primary_founder || false;
 
-    if (!determinedRoleTier) {
-      if (user.role === "admin") {
-        determinedRoleTier = "main_admin";
-        determinedFounderStatus = true;
-      } else {
-        determinedRoleTier = "member";
-      }
+    if (user.role === "admin" || determinedRoleTier === "admin") {
+      determinedRoleTier = "main_admin";
+      determinedFounderStatus = true;
     }
 
-    // 4. Generate the secure JWT token payload using updated hierarchical properties
     const token = jwt.sign(
       { 
         id: user.id, 
         email: user.email, 
         username: user.username,
-        role_tier: determinedRoleTier,         // 🔥 Updated: New security role parameter
-        is_primary_founder: determinedFounderStatus // 🔥 Updated: New protective flag parameter
+        role_tier: determinedRoleTier,         
+        is_primary_founder: determinedFounderStatus 
       },
       process.env.JWT_SECRET,
       { expiresIn: "24h" } 
     );
 
-    // 5. Send token and user parameters back to client interface
     return res.status(200).json({
       success: true,
       message: "Authentication successful.",
@@ -150,8 +134,8 @@ export const loginUser = async (req, res) => {
         username: user.username,
         email: user.email,
         is_verified: user.is_verified,
-        role_tier: determinedRoleTier,         // 🔥 Updated: Frontend state tree now reads this
-        is_primary_founder: determinedFounderStatus // 🔥 Updated: Customizes administrative dashboard access
+        role_tier: determinedRoleTier,         
+        is_primary_founder: determinedFounderStatus 
       },
     });
 
@@ -177,15 +161,12 @@ export const forgotPassword = async (req, res) => {
 
     const sanitizedEmail = email.trim().toLowerCase();
 
-    // 1. Check if the user profile exists inside Olofin Heritage Club directory
     const { data: user, error: fetchErr } = await supabase
       .from("users")
       .select("id, username, email")
       .eq("email", sanitizedEmail)
       .single();
 
-    // Safety: For security reasons, don't explicitly confirm if an email doesn't exist 
-    // to protect your database from email enumeration hackers.
     if (fetchErr || !user) {
       return res.status(200).json({ 
         success: true, 
@@ -193,13 +174,9 @@ export const forgotPassword = async (req, res) => {
       });
     }
 
-    // 2. Generate a secure, unguessable random token string
     const resetToken = crypto.randomBytes(32).toString("hex");
-    
-    // Set validation window to expire strictly after 15 minutes
     const tokenExpiryTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-    // 3. Save the token and expiry date right into the user row
     const { error: updateErr } = await supabase
       .from("users")
       .update({
@@ -210,11 +187,8 @@ export const forgotPassword = async (req, res) => {
 
     if (updateErr) throw updateErr;
 
-    // 4. Construct the reset verification URL link
-    // Change localhost to your real domain when you deploy!
     const passwordResetLink = `http://localhost:3000/reset-password/${resetToken}`;
 
-    // 🎯 5. Send Professional Password Reset Email Template
     const forgotEmailTemplate = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
         <h2 style="color: #2c3e50; text-align: center;">🔒 Account Password Reset Request</h2>
@@ -243,7 +217,6 @@ export const forgotPassword = async (req, res) => {
   }
 };
 
-
 // @desc    Verify validation token and change user account password 
 // @route   PUT /api/auth/reset-password/:token
 // @access  Public
@@ -258,12 +231,11 @@ export const resetPassword = async (req, res) => {
 
     const currentTimeStamp = new Date().toISOString();
 
-    // 1. Query table to find the matching token AND ensure the expiry timestamp hasn't passed
     const { data: user, error: fetchErr } = await supabase
       .from("users")
       .select("id, username")
       .eq("reset_password_token", token)
-      .gt("reset_password_expires", currentTimeStamp) // Checks if column expiration value > right now
+      .gt("reset_password_expires", currentTimeStamp) 
       .single();
 
     if (fetchErr || !user) {
@@ -273,16 +245,14 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-    // 2. Hash the fresh incoming password safely
     const salt = await bcrypt.genSalt(10);
     const encryptedNewPassword = await bcrypt.hash(newPassword, salt);
 
-    // 3. Clear out token fields and record the brand-new password string hash
     const { error: updateErr } = await supabase
       .from("users")
       .update({
         password: encryptedNewPassword,
-        reset_password_token: null,       // Wipe token completely so it can't be used twice!
+        reset_password_token: null,       
         reset_password_expires: null
       })
       .eq("id", user.id);
@@ -305,11 +275,10 @@ export const resetPassword = async (req, res) => {
 // @access  Private/Admin
 export const getAllUsers = async (req, res) => {
   try {
-    // Fetch all records from the 'users' table
     const { data, error } = await supabase
       .from("users")
       .select("*")
-      .order("id", { ascending: true }); // Groups them neatly by order of creation
+      .order("id", { ascending: true }); 
 
     if (error) throw error;
 
@@ -333,10 +302,9 @@ export const getAllUsers = async (req, res) => {
 // @access  Private/Admin
 export const deleteUser = async (req, res) => {
   try {
-    const { id } = req.params; // Grabs the user's ID directly from the URL path
-    const adminExecutingDeletion = req.user?.id; // Safely extracts logged-in admin ID from your auth middleware
+    const { id } = req.params; 
+    const adminExecutingDeletion = req.user?.id; 
 
-    // 🔥 1. SHIELD CHECK FIRST: Prevent self-destructive lockout operations instantly
     if (String(id) === String(adminExecutingDeletion)) {
       return res.status(403).json({
         success: false,
@@ -344,7 +312,6 @@ export const deleteUser = async (req, res) => {
       });
     }
 
-    // 🔍 2. EXISTENCE CHECK: Verify the target profile exists in the pool
     const { data: existingUser, error: findError } = await supabase
       .from("users")
       .select("id, username")
@@ -358,7 +325,6 @@ export const deleteUser = async (req, res) => {
       });
     }
 
-    // 🗑️ 3. EXECUTION: Perform the permanent cascade deletion
     const { error: deleteError } = await supabase
       .from("users")
       .delete()
@@ -366,7 +332,6 @@ export const deleteUser = async (req, res) => {
 
     if (deleteError) throw deleteError;
 
-    // 🎉 SUCCESS RESPONSE
     return res.status(200).json({
       success: true,
       message: `User '${existingUser.username}' has been successfully removed from the platform.`,
@@ -390,7 +355,6 @@ export const creditUser = async (req, res) => {
     const { id } = req.params;
     const { amount, description } = req.body;
 
-    // 1. Validation
     if (amount === undefined || isNaN(amount) || Number(amount) <= 0) {
       return res.status(400).json({
         success: false,
@@ -400,7 +364,6 @@ export const creditUser = async (req, res) => {
 
     const creditAmount = Number(amount);
 
-    // 2. Fetch current balance
     const { data: user, error: findError } = await supabase
       .from("users")
       .select("id, amount_paid")
@@ -412,9 +375,8 @@ export const creditUser = async (req, res) => {
     }
 
     const previousBalance = Number(user.amount_paid);
-    const newBalance = previousBalance + creditAmount; // 🟢 ADDING FUNDS
+    const newBalance = previousBalance + creditAmount; 
 
-    // 3. Update User Balance
     const { data: updatedUser, error: updateError } = await supabase
       .from("users")
       .update({ amount_paid: newBalance })
@@ -423,11 +385,10 @@ export const creditUser = async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // 4. Log to Transactions Table
     await supabase.from("transactions").insert([
       {
         user_id: id,
-        amount_changed: creditAmount, // Positive number shows it was a credit
+        amount_changed: creditAmount, 
         previous_balance: previousBalance,
         new_balance: newBalance,
         description: description || "Admin credited contribution account.",
@@ -453,7 +414,6 @@ export const debitUser = async (req, res) => {
     const { id } = req.params;
     const { amount, description } = req.body;
 
-    // 1. Validation
     if (amount === undefined || isNaN(amount) || Number(amount) <= 0) {
       return res.status(400).json({
         success: false,
@@ -463,7 +423,6 @@ export const debitUser = async (req, res) => {
 
     const debitAmount = Number(amount);
 
-    // 2. Fetch current balance
     const { data: user, error: findError } = await supabase
       .from("users")
       .select("id, amount_paid")
@@ -476,7 +435,6 @@ export const debitUser = async (req, res) => {
 
     const previousBalance = Number(user.amount_paid);
 
-    // 🛑 Critical Check: Prevent account balances from dropping into negative numbers
     if (previousBalance - debitAmount < 0) {
       return res.status(400).json({
         success: false,
@@ -484,9 +442,8 @@ export const debitUser = async (req, res) => {
       });
     }
 
-    const newBalance = previousBalance - debitAmount; // 🔴 SUBTRACTING FUNDS
+    const newBalance = previousBalance - debitAmount; 
 
-    // 3. Update User Balance
     const { data: updatedUser, error: updateError } = await supabase
       .from("users")
       .update({ amount_paid: newBalance })
@@ -495,11 +452,10 @@ export const debitUser = async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // 4. Log to Transactions Table
     await supabase.from("transactions").insert([
       {
         user_id: id,
-        amount_changed: -debitAmount, // Save as a negative number to indicate a deduction!
+        amount_changed: -debitAmount, 
         previous_balance: previousBalance,
         new_balance: newBalance,
         description: description || "Admin debited contribution account.",
@@ -533,7 +489,7 @@ export const getAllTransactions = async (req, res) => {
         description,
         users ( id, username, email )
       `)
-      .order("created_at", { ascending: false }); // Newest changes appear first
+      .order("created_at", { ascending: false }); 
 
     if (error) throw error;
 
@@ -557,7 +513,7 @@ export const getAllTransactions = async (req, res) => {
 export const createDepositRequest = async (req, res) => {
   try {
     const { amount, proof_url } = req.body;
-    const { id: user_id, username } = req.user; // Pulled from your verified JWT token
+    const { id: user_id, username } = req.user; 
 
     if (!amount || !proof_url) {
       return res.status(400).json({ success: false, message: "Please provide amount and proof of payment." });
@@ -576,7 +532,6 @@ export const createDepositRequest = async (req, res) => {
   }
 };
 
-
 // @desc    Approve a pending deposit request, credit user, and log historical transaction entries
 // @route   PATCH /api/auth/deposits/:id/approve
 // @access  Private/Admin
@@ -584,7 +539,6 @@ export const approveDepositRequest = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 1. Fetch the original pending deposit request data
     const { data: deposit, error: fetchError } = await supabase
       .from("deposits")
       .select("*")
@@ -599,10 +553,9 @@ export const approveDepositRequest = async (req, res) => {
       return res.status(400).json({ success: false, message: "This transaction deposit log has already been approved." });
     }
 
-    // 2. Fetch the target user's current record details
     const { data: user, error: userError } = await supabase
       .from("users")
-      .select("amount_paid")
+      .select("amount_paid, email")
       .eq("id", deposit.user_id)
       .single();
 
@@ -610,14 +563,10 @@ export const approveDepositRequest = async (req, res) => {
       return res.status(404).json({ success: false, message: "Associated transaction member profile record missing." });
     }
 
-    // 🔥 PRECISE BALANCE CALCULATIONS BASED ON YOUR SQL FIELDS
-    const previousBalance = Number(user.amount_paid || 0); // This is what we needed!
+    const previousBalance = Number(user.amount_paid || 0); 
     const depositAmount = Number(deposit.amount);
     const newComputedBalance = previousBalance + depositAmount;
 
-    // 3. Perform the safe sequential atomic database updates:
-    
-    // A. Mark deposit status index as approved
     const { error: updateDepositError } = await supabase
       .from("deposits")
       .update({ status: "approved" })
@@ -625,7 +574,6 @@ export const approveDepositRequest = async (req, res) => {
 
     if (updateDepositError) throw updateDepositError;
 
-    // B. Inject credit value additions straight into the member profile's core balance
     const { error: updateUserError } = await supabase
       .from("users")
       .update({ amount_paid: newComputedBalance })
@@ -633,13 +581,12 @@ export const approveDepositRequest = async (req, res) => {
 
     if (updateUserError) throw updateUserError;
 
-    // 🔥 C. FIXED: Inserting all mandatory schema parameters into your public.transactions table
     const { error: logTransactionError } = await supabase
       .from("transactions")
       .insert({
         user_id: deposit.user_id,
         amount_changed: depositAmount,
-        previous_balance: previousBalance, // Added to clear the NOT NULL constraint!
+        previous_balance: previousBalance, 
         new_balance: newComputedBalance,
         description: `Approved Deposit Receipt Log - Ref #${id}`
       });
@@ -649,27 +596,29 @@ export const approveDepositRequest = async (req, res) => {
       throw logTransactionError;
     }
 
+    // 👍 FIXED: Email template logic moved BEFORE response return block so it sends successfully
+    const depositEmailTemplate = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+        <h3 style="color: #2498db;">💳 Payment Deposit Verified</h3>
+        <p>Hello,</p>
+        <p>Your deposit tracking voucher has been processed and verified successfully by the administration panel.</p>
+        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+          <tr style="background: #f8f9fa;"><td style="padding: 8px; font-weight: bold;">Amount Loaded:</td><td style="padding: 8px; color: #2ecc71; font-weight: bold;">₦${depositAmount.toLocaleString()}</td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Transaction Status:</td><td style="padding: 8px; color: #2ecc71;">Credited to Savings Pool</td></tr>
+        </table>
+        <p>Thank you for your consistent participation inside the collective portfolio workspace!</p>
+      </div>
+    `;
+    
+    // Safely send out the transaction email
+    if (user.email) {
+      await sendSystemEmail(user.email, "Financial Ledger Update: Deposit Cleared ✅", depositEmailTemplate);
+    }
+
     return res.status(200).json({
       success: true,
       message: "Deposit parameters verified, balance scaled, and transaction audit logs recorded cleanly!",
     });
-
-    // Inside approveDepositRequest controller...
-if (depositIsApproved) {
-  const depositEmailTemplate = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-      <h3 style="color: #2498db;">💳 Payment Deposit Verified</h3>
-      <p>Hello,</p>
-      <p>Your deposit tracking voucher has been processed and verified successfully by the administration panel.</p>
-      <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-        <tr style="background: #f8f9fa;"><td style="padding: 8px; font-weight: bold;">Amount Loaded:</td><td style="padding: 8px; color: #2ecc71; font-weight: bold;">₦${amount.toLocaleString()}</td></tr>
-        <tr><td style="padding: 8px; font-weight: bold;">Transaction Status:</td><td style="padding: 8px; color: #2ecc71;">Credited to Savings Pool</td></tr>
-      </table>
-      <p>Thank you for your consistent participation inside the collective portfolio workspace!</p>
-    </div>
-  `;
-  await sendSystemEmail(userEmailAddress, "Financial Ledger Update: Deposit Cleared ✅", depositEmailTemplate);
-}
 
   } catch (error) {
     console.error("Deposit approval system error:", error);
@@ -680,26 +629,6 @@ if (depositIsApproved) {
     });
   }
 };
-// @route   POST /api/auth/logout
-// @access  Private (Requires token verification)
-export const logoutUser = async (req, res) => {
-  try {
-    // If you ever expand your app to use HTTP-Only Cookies, we clear them here:
-    // res.clearCookie('token');
-
-    return res.status(200).json({
-      success: true,
-      message: "Session ended successfully on server."
-    });
-  } catch (error) {
-    console.error("Logout System Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error during logout processing."
-    });
-  }
-};
-
 
 // @desc    Update member profile parameters (Username / Password)
 // @route   PUT /api/user/update-profile
@@ -707,16 +636,14 @@ export const logoutUser = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const { username, password } = req.body;
-    const userId = req.user.id; // Pulled straight from your verified JWT middleware payload
+    const userId = req.user.id; 
 
     if (!username) {
       return res.status(400).json({ success: false, message: "Username parameter cannot be blank." });
     }
 
-    // 1. Build out the update map data template dynamically
     const updateData = { username: username.trim() };
 
-    // 2. If user provided a password string text, hash it securely before saving
     if (password && password.trim() !== "") {
       if (password.length < 6) {
         return res.status(400).json({ success: false, message: "Password must be at least 6 characters long." });
@@ -725,7 +652,6 @@ export const updateProfile = async (req, res) => {
       updateData.password = await bcrypt.hash(password, salt);
     }
 
-    // 3. Update data within Supabase user relation row
     const { data, error } = await supabase
       .from("users")
       .update(updateData)
@@ -762,5 +688,23 @@ export const getPendingDeposits = async (req, res) => {
     return res.status(200).json({ success: true, data });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    End secure session
+// @route   POST /api/auth/logout
+// @access  Private 
+export const logoutUser = async (req, res) => {
+  try {
+    return res.status(200).json({
+      success: true,
+      message: "Session ended successfully on server."
+    });
+  } catch (error) {
+    console.error("Logout System Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during logout processing."
+    });
   }
 };
