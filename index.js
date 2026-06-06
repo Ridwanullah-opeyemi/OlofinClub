@@ -37,10 +37,12 @@ import {
   resolveLoanRequest, 
   submitLoanRepayment 
 } from "./controllers/loans.js";
+const PORT = process.env.PORT || 5000;
 
 dotenv.config();
 
 const app = express();
+
 
 // Global Middleware Config Stack
 app.use(cors());
@@ -62,9 +64,9 @@ app.get("/api/auth/users", verifyAdmin, getAllUsers);
 app.delete("/api/auth/users/:id", verifyAdmin, deleteUser);
 app.get("/api/auth/transactions", verifyAdmin, getAllTransactions);
 
-// ==========================================================================
+// =========================================================================
 // 📩 NEW: MEMBERSHIP REQUEST & VETTING ROUTE CHANNELS
-// ==========================================================================
+// =========================================================================
 app.post("/api/auth/membership-request", postMembershipRequest);
 app.get("/api/auth/membership-requests/pending", verifyAdmin, getPendingRequests);
 app.post("/api/auth/membership-requests/:requestId/resolve", verifyAdmin, resolveMembershipRequest);
@@ -118,8 +120,7 @@ app.post("/api/auth/logout", verifyUser, logoutUser);
 
 // ==========================================================================
 // 🚀 ENGINE BOOTSTRAP INITIALIZATION
-// ==========================================================================
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`[SYSTEM] WealthBridge Server active on network port: ${PORT}`);
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`[SYSTEM] Olofin Club Server active on network port: ${PORT}`);
 });
