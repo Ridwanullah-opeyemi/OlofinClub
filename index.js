@@ -1,6 +1,6 @@
-import "./init.js"; // 🚀 CRITICAL: This MUST be line 1 to fix your bugs!
 import express from "express";
 import cors from "cors";
+import dotenv from "dotenv"; // 🎯 Restored dotenv import
 import { 
   approveDepositRequest, 
   createDepositRequest, 
@@ -36,6 +36,9 @@ import {
   resolveLoanRequest, 
   submitLoanRepayment 
 } from "./controllers/loans.js";
+
+// Initialize environment variables immediately following imports
+dotenv.config();
 
 const PORT = process.env.PORT || 5000;
 const app = express();
