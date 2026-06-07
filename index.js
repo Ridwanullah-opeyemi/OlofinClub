@@ -1,6 +1,6 @@
+import "./init.js"; // 🚀 CRITICAL: This MUST be line 1 to fix your bugs!
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { 
   approveDepositRequest, 
   createDepositRequest, 
@@ -27,7 +27,6 @@ import {
   postMembershipRequest, 
   resolveMembershipRequest 
 } from "./controllers/adminManagement.js";
-// 🎯 ADDED: Imported 'getPendingLoanRequests' from your loans controller
 import { 
   getPendingLoanRequests, 
   getPendingRepayments, 
@@ -37,12 +36,9 @@ import {
   resolveLoanRequest, 
   submitLoanRepayment 
 } from "./controllers/loans.js";
+
 const PORT = process.env.PORT || 5000;
-
-dotenv.config();
-
 const app = express();
-
 
 // Global Middleware Config Stack
 app.use(cors());
@@ -99,17 +95,13 @@ app.get("/api/admin-chat/messages", verifyAdmin, getChatHistory);
 // ==========================================================================
 // 💸 LOAN SYSTEM CHANNELS & PIPELINES
 // ==========================================================================
-// Member Borrow Interoperability Operations
 app.post("/api/user/loans/request", verifyUser, requestLoan);
 app.post("/api/user/loans/repay", verifyUser, submitLoanRepayment); 
 
-// Administrative Oversight Channels
 app.post("/api/auth/loans/:requestId/resolve", verifyAdmin, resolveLoanRequest);
 app.get("/api/auth/loans/repayments/pending", verifyAdmin, getPendingRepayments); 
 app.post("/api/auth/loans/repayments/:repaymentId/resolve", verifyAdmin, resolveLoanRepayment);
 app.put("/api/auth/loans/repay-direct/:id", verifyAdmin, handleDirectAdminRepayment);
-
-// 🎯 FIXED: Added the missing route your frontend dashboard needs to read pending loans!
 app.get("/api/auth/loans/pending", verifyAdmin, getPendingLoanRequests);
 
 // ==========================================================================
@@ -120,7 +112,6 @@ app.post("/api/auth/logout", verifyUser, logoutUser);
 
 // ==========================================================================
 // 🚀 ENGINE BOOTSTRAP INITIALIZATION
-
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`[SYSTEM] Olofin Club Server active on network port: ${PORT}`);
 });
