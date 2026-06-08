@@ -1,6 +1,9 @@
+// 🎯 Load env vars FIRST — before any other import reads process.env (e.g. db.js, JWT secret)
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv"; // 🎯 Restored dotenv import
 import { 
   approveDepositRequest, 
   createDepositRequest, 
@@ -34,11 +37,9 @@ import {
   requestLoan, 
   resolveLoanRepayment, 
   resolveLoanRequest, 
-  submitLoanRepayment 
+  submitLoanRepayment,
+  // getUserLoans,          // 🎯 Added: lets members view their own loan history
 } from "./controllers/loans.js";
-
-// Initialize environment variables immediately following imports
-dotenv.config();
 
 const PORT = process.env.PORT || 5000;
 const app = express();
@@ -99,7 +100,8 @@ app.get("/api/admin-chat/messages", verifyAdmin, getChatHistory);
 // 💸 LOAN SYSTEM CHANNELS & PIPELINES
 // ==========================================================================
 app.post("/api/user/loans/request", verifyUser, requestLoan);
-app.post("/api/user/loans/repay", verifyUser, submitLoanRepayment); 
+app.post("/api/user/loans/repay", verifyUser, submitLoanRepayment);
+// app.get("/api/user/loans/history", verifyUser, getUserLoans);       // 🎯 Added: member views own loan history
 
 app.post("/api/auth/loans/:requestId/resolve", verifyAdmin, resolveLoanRequest);
 app.get("/api/auth/loans/repayments/pending", verifyAdmin, getPendingRepayments); 
@@ -114,7 +116,15 @@ app.post("/api/auth/login", loginUser);
 app.post("/api/auth/logout", verifyUser, logoutUser);
 
 // ==========================================================================
+// 🚧 GLOBAL 404 FALLBACK — catches any unmatched route
+// ==========================================================================
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
+// ==========================================================================
 // 🚀 ENGINE BOOTSTRAP INITIALIZATION
+// ==========================================================================
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`[SYSTEM] Olofin Club Server active on network port: ${PORT}`);
 });
