@@ -595,6 +595,10 @@ export const approveDepositRequest = async (req, res) => {
       console.error("Supabase Insertion Error:", logTransactionError);
       throw logTransactionError;
     }
+    return res.status(200).json({
+      success: true,
+      message: "Deposit parameters verified, balance scaled, and transaction audit logs recorded cleanly!",
+    });
 
     // 👍 FIXED: Email template logic moved BEFORE response return block so it sends successfully
     const depositEmailTemplate = `
@@ -615,10 +619,7 @@ export const approveDepositRequest = async (req, res) => {
       await sendSystemEmail(user.email, "Financial Ledger Update: Deposit Cleared ✅", depositEmailTemplate);
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Deposit parameters verified, balance scaled, and transaction audit logs recorded cleanly!",
-    });
+    
 
   } catch (error) {
     console.error("Deposit approval system error:", error);
